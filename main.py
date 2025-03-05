@@ -4,12 +4,12 @@ import numpy as np
 import paramiko
 import time
 flag = True
-debug = True
+debug = False
 camera_control = False
 video_stream = cv2.VideoCapture('http://root:admin@10.128.73.78/mjpg/video.mjpg')
 
 def set_speed(lspeed, rspeed):
-    if debug:
+    if not debug:
         shell.send(f'{lspeed} {rspeed}\n')
 
 
@@ -33,6 +33,7 @@ unload_area = (170, 130, 210)
 dh, ds, dv = 17, 30, 19
 dh2, ds2, dv2 = 19, 116, 45
 dh3, ds3, dv3 = 9, 66, 68
+x_click, y_click = -1, -1
 arDict = {}
 def calculate_center(corners):
     center_x = (corners[0][0][0] + corners[0][1][0] + corners[0][2][0] + corners[0][3][0]) // 4
@@ -88,7 +89,7 @@ def getANGaruco(id):
         return (None, None)
 
 def click(event, x, y, flags, param):
-    global keep_area, load_area, unload_area, flag
+    global keep_area, load_area, unload_area, flag, x_click, y_click
     if event == cv2.EVENT_RBUTTONDOWN:
     #     flag = not flag
         keep_area = hsv[y][x]
@@ -97,8 +98,11 @@ def click(event, x, y, flags, param):
         load_area = hsv[y][x]
         print(load_area)
     if event == cv2.EVENT_LBUTTONDOWN:
-        unload_area = hsv[y][x]
-        print(unload_area)
+        x_click = x
+        y_click = y
+        print(x_click, y_click)
+        # unload_area = hsv[y][x]
+        # print(unload_area)
 
 def draw_contours(image, mask, num=2, color=(0, 255, 0), thickness=2):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -183,23 +187,34 @@ while True:
         [min(int(unload_area[0]) + dh3, 255), min(int(unload_area[1]) + ds3, 255), min(int(unload_area[2]) + dv3, 255)])
     unload_area_mask = cv2.inRange(hsv, lowUA, highUA)
     try:
-        if getXYaruco(2) and getXYaruco(9):
-            xr, yr = getXYaruco(2)
-            xtarget, ytarget = getXYaruco(9)
-            x_kat = xr - xtarget
-            y_kat = yr - ytarget
-            ang_rad = np.arctan2(y_kat, x_kat)
-            ang_deg = np.degrees(ang_rad)
-            ang_r = getANGaruco(2)
-            u = 0
-            ang_err = 0
-            if ang_deg - ang_r  - 90 != 0:
-                sign = (ang_deg - ang_r - 90) / abs(ang_deg - ang_r - 90)
-                errs = [abs(ang_deg - ang_r - 90), abs(ang_deg - ang_r - 90 + 360), abs(ang_deg - ang_r - 90 - 360)]
-                ang_err = min(errs) * sign
-                print(ang_err, sign)
-            u = int(ang_err * 2)
-            set_speed(-u, u)
+        if getXYaruco(2):
+            if x_click != -1:
+                xr, yr = getXYaruco(2)
+                xtarget, ytarget = x_click, y_click
+                cv2.line(img, (xr, yr), (xtarget, ytarget), (255, 0, 0), 2)
+                x_kat = xr - xtarget
+                y_kat = yr - ytarget
+                dist_err = (x_kat ** 2 + y_kat ** 2) ** 0.5
+                ang_rad = np.arctan2(y_kat, x_kat)
+                ang_deg = np.degrees(ang_rad)
+                ang_r = getANGaruco(2)
+                u = 0
+                ang_err = 0
+
+                if (ang_deg - ang_r  - 90) % 360 != 0:
+                    signs = [(ang_deg - ang_r - 90)/abs(ang_deg - ang_r - 90), (ang_deg - ang_r - 90 + 360)/abs(ang_deg - ang_r - 90 + 360), (ang_deg - ang_r - 90 - 360)/abs(ang_deg - ang_r - 90 - 360)]
+                    errs = [abs(ang_deg - ang_r - 90), abs(ang_deg - ang_r - 90 + 360), abs(ang_deg - ang_r - 90 - 360)]
+                    indx_err = errs.index(min(errs))
+                    ang_err = min(errs) * signs[indx_err]
+                    print(ang_err, signs[indx_err])
+                if abs(ang_err) > 20 and dist_err > 100:
+                    u = int(ang_err * 3)
+                    set_speed(u, -u)
+                elif dist_err:
+                    u = int(ang_err * 1)
+                    u_dist = int(dist_err * 2)
+                    set_speed(u_dist + u,u_dist - u)
+
         else:
             set_speed(0, 0)
 
