@@ -5,10 +5,12 @@ import paramiko
 import time
 flag = True
 debug = True
+camera_control = False
 video_stream = cv2.VideoCapture('http://root:admin@10.128.73.78/mjpg/video.mjpg')
 
 def set_speed(lspeed, rspeed):
-    shell.send(f'{lspeed} {rspeed}\n')
+    if debug:
+        shell.send(f'{lspeed} {rspeed}\n')
 
 
 if not debug:
@@ -50,13 +52,13 @@ def calculate_angle(corners):
 
 
 def findAruco(img, draw=True):
+
     global arDict
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     arucoDict = aruco.getPredefinedDictionary(aruco.DICT_4X4_250)  # Используем новый метод
-    arucoParam = aruco.DetectorParameters_create()
-    #detector = aruco.ArucoDetector(arucoDict, arucoParam)  # Создаём детектор
-    bbox, ids, _ = aruco.detectMarkers(gray, arucoDict, parameters=arucoParam)
-    # bbox, ids, _ = detector.detectMarkers(gray)  # Используем детектор
+    arucoParam = aruco.DetectorParameters()
+    detector = aruco.ArucoDetector(arucoDict, arucoParam)  # Создаём детектор
+    bbox, ids, _ = detector.detectMarkers(gray)  # Используем детектор
     if ids is not None and draw:
         for i, marker_id in enumerate(ids):
             color = (0, 255, 0)
@@ -145,17 +147,17 @@ def hue_dv3_trackbar(val):
     global dv3
     dv3 = val
 
-
-cv2.namedWindow("Trackbars")
-cv2.createTrackbar("dh", "Trackbars", dh, 255, hue_dh_trackbar)
-cv2.createTrackbar("ds", "Trackbars", ds, 255, hue_ds_trackbar)
-cv2.createTrackbar("dv", "Trackbars", dv, 255, hue_dv_trackbar)
-cv2.createTrackbar("dh2", "Trackbars", dh2, 255, hue_dh2_trackbar)
-cv2.createTrackbar("ds2", "Trackbars", ds2, 255, hue_ds2_trackbar)
-cv2.createTrackbar("dv2", "Trackbars", dv2, 255, hue_dv2_trackbar)
-cv2.createTrackbar("dh3", "Trackbars", dh3, 255, hue_dh3_trackbar)
-cv2.createTrackbar("ds3", "Trackbars", ds3, 255, hue_ds3_trackbar)
-cv2.createTrackbar("dv3", "Trackbars", dv3, 255, hue_dv3_trackbar)
+if camera_control:
+    cv2.namedWindow("Trackbars")
+    cv2.createTrackbar("dh", "Trackbars", dh, 255, hue_dh_trackbar)
+    cv2.createTrackbar("ds", "Trackbars", ds, 255, hue_ds_trackbar)
+    cv2.createTrackbar("dv", "Trackbars", dv, 255, hue_dv_trackbar)
+    cv2.createTrackbar("dh2", "Trackbars", dh2, 255, hue_dh2_trackbar)
+    cv2.createTrackbar("ds2", "Trackbars", ds2, 255, hue_ds2_trackbar)
+    cv2.createTrackbar("dv2", "Trackbars", dv2, 255, hue_dv2_trackbar)
+    cv2.createTrackbar("dh3", "Trackbars", dh3, 255, hue_dh3_trackbar)
+    cv2.createTrackbar("ds3", "Trackbars", ds3, 255, hue_ds3_trackbar)
+    cv2.createTrackbar("dv3", "Trackbars", dv3, 255, hue_dv3_trackbar)
 
 
 
@@ -203,10 +205,10 @@ while True:
 
     except Exception as err:
         print(err)
-
-    cv2.imshow("keep_area_mask", keep_area_mask)
-    cv2.imshow("load_area_mask", load_area_mask)
-    cv2.imshow("unload_area_mask", unload_area_mask)
+    if camera_control:
+        cv2.imshow("keep_area_mask", keep_area_mask)
+        cv2.imshow("load_area_mask", load_area_mask)
+        cv2.imshow("unload_area_mask", unload_area_mask)
 
     draw_contours(img, keep_area_mask, num=7, color=(255, 0, 0), thickness=2)
     draw_contours(img, load_area_mask, num=1, color=(0, 255, 0), thickness=2)
