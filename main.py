@@ -28,7 +28,7 @@ work_zone2 = (1050, 800)
 keep_area = (96,  59, 255)
 load_area = (105, 236, 226)
 unload_area = (170, 130, 210)
-dh, ds, dv = 19, 45, 19
+dh, ds, dv = 17, 30, 19
 dh2, ds2, dv2 = 19, 116, 45
 dh3, ds3, dv3 = 9, 66, 68
 arDict = {}
@@ -53,14 +53,13 @@ def findAruco(img, draw=True):
     global arDict
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     arucoDict = aruco.getPredefinedDictionary(aruco.DICT_4X4_250)  # Используем новый метод
-    arucoParam = aruco.DetectorParameters()
-    detector = aruco.ArucoDetector(arucoDict, arucoParam)  # Создаём детектор
-    bbox, ids, _ = detector.detectMarkers(gray)  # Используем детектор
+    arucoParam = aruco.DetectorParameters_create()
+    #detector = aruco.ArucoDetector(arucoDict, arucoParam)  # Создаём детектор
+    bbox, ids, _ = aruco.detectMarkers(gray, arucoDict, parameters=arucoParam)
+    # bbox, ids, _ = detector.detectMarkers(gray)  # Используем детектор
     if ids is not None and draw:
         for i, marker_id in enumerate(ids):
             color = (0, 255, 0)
-
-
             corners = bbox[i].astype(int)
             angle = calculate_angle(corners)
             center = calculate_center(corners)
@@ -89,25 +88,25 @@ def getANGaruco(id):
 def click(event, x, y, flags, param):
     global keep_area, load_area, unload_area, flag
     if event == cv2.EVENT_RBUTTONDOWN:
-        flag = not flag
-    #     keep_area = hsv[y][x]
-    #     print(keep_area)
-    # if event == cv2.EVENT_MBUTTONDOWN:
-    #     load_area = hsv[y][x]
-    #     print(load_area)
-    # if event == cv2.EVENT_LBUTTONDOWN:
-    #     unload_area = hsv[y][x]
-    #     print(unload_area)
+    #     flag = not flag
+        keep_area = hsv[y][x]
+        print(keep_area)
+    if event == cv2.EVENT_MBUTTONDOWN:
+        load_area = hsv[y][x]
+        print(load_area)
+    if event == cv2.EVENT_LBUTTONDOWN:
+        unload_area = hsv[y][x]
+        print(unload_area)
 
 def draw_contours(image, mask, num=2, color=(0, 255, 0), thickness=2):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
     contours = sorted(contours, key=cv2.contourArea, reverse=True)
-    if num == 1:
-        if len(contours) >= 2:
-            biggest_contours = contours[:2]
-            all_points = np.vstack(biggest_contours)
-            x, y, w, h = cv2.boundingRect(all_points)
-            cv2.rectangle(image, (x, y), (x + w, y + h), color, thickness)
+    # if num == 1:
+    #     if len(contours) >= 2:
+    #         biggest_contours = contours[:2]
+    #         all_points = np.vstack(biggest_contours)
+    #         x, y, w, h = cv2.boundingRect(all_points)
+    #         cv2.rectangle(image, (x, y), (x + w, y + h), color, thickness)
     for i in range(min(num, len(contours))):
         contour = contours[i]
         area = cv2.contourArea(contour)
