@@ -106,8 +106,10 @@ def findAruco(img, draw=True):
             if marker_id == 2 or marker_id == 3:
                 color = (255, 0, 0)
                 cv2.circle(img, center, 25, color, 3)
-            if marker_id >= 4 and marker_id <= 11 and marker_id != targets[target_ind]:
-                cent = np.array([center])
+            if marker_id >= 4 and marker_id <= 11:
+                if target_ind < len(targets):
+                    if marker_id != targets[target_ind]:
+                        cent = np.array([center])
                 cargos = np.concatenate((cargos, cent), axis=0)
             cv2.polylines(img, [corners], isClosed=True, color=color, thickness=2)
             cv2.putText(img, f"{marker_id[0]}", tuple(corners[0][0]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (120, 0, 255), 2)
@@ -249,9 +251,6 @@ while True:
     try:
         if getXYaruco(2)[0] != -1:
             xr, yr = getXYaruco(2)
-            if hasTarget == False:
-                target = getXYaruco(targets[target_ind])
-                hasTarget = True
 
 
             if target[0] != -1 and not stop:
@@ -262,18 +261,21 @@ while True:
                         target_ind += 1
                     else:
                         stop = True
-
                     hasTarget = False
-                for x in range(0, 40):
-                    for y in range(0, 40):
-                        r_pos = np.array([x * 25, y * 25])
 
-                        vect_attr = attraction(r_pos, target)
-                        vect_repl = replusion(r_pos)
-                        sum_vect = vect_attr + vect_repl
-
-                        cv2.arrowedLine(img, r_pos, (int(r_pos[0] + sum_vect[0]), int(r_pos[1] + sum_vect[1])), (0, 0, 255), 1)
-                        # cv2.arrowedLine(img, r_pos, (int(r_pos[0] + vect_attr[0]), int(r_pos[1] + vect_attr[1])),
+                if hasTarget == False:
+                    target = getXYaruco(targets[target_ind])
+                    hasTarget = True
+                # for x in range(0, 40):
+                #     for y in range(0, 40):
+                #         r_pos = np.array([x * 25, y * 25])
+                #
+                #         vect_attr = attraction(r_pos, target)
+                #         vect_repl = replusion(r_pos)
+                #         sum_vect = vect_attr + vect_repl
+                #
+                #         cv2.arrowedLine(img, r_pos, (int(r_pos[0] + sum_vect[0]), int(r_pos[1] + sum_vect[1])), (0, 0, 255), 1)
+                #         # cv2.arrowedLine(img, r_pos, (int(r_pos[0] + vect_attr[0]), int(r_pos[1] + vect_attr[1])),
                         #                 (255, 0, 255), 1)
 
 
