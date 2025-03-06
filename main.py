@@ -3,15 +3,24 @@ import cv2.aruco as aruco
 import numpy as np
 import paramiko
 import time
+import math
+
+from unicodedata import normalize
+
 flag = True
 debug = False
 camera_control = False
 video_stream = cv2.VideoCapture('http://root:admin@10.128.73.78/mjpg/video.mjpg')
-
+cargos = np.array([[]])
+target_ind = 0
+hasTarget = False
+target = [-1, -1]
+targets = [9, 11, 5, 10]
+print(cargos)
+stop = True
 def set_speed(lspeed, rspeed):
     if not debug:
         shell.send(f'{lspeed} {rspeed}\n')
-
 
 if not debug:
     ssh = paramiko.SSHClient()
@@ -29,17 +38,46 @@ work_zone1 = (200, 0)
 work_zone2 = (1050, 800)
 keep_area = (96,  59, 255)
 load_area = (105, 236, 226)
+cargo = (103, 88, 233)
 unload_area = (170, 130, 210)
-dh, ds, dv = 17, 30, 19
+dh, ds, dv = 26, 40, 19
 dh2, ds2, dv2 = 19, 116, 45
 dh3, ds3, dv3 = 9, 66, 68
+dh4, ds4, dv4 = 9, 66, 68
 x_click, y_click = -1, -1
 arDict = {}
 def calculate_center(corners):
     center_x = (corners[0][0][0] + corners[0][1][0] + corners[0][2][0] + corners[0][3][0]) // 4
     center_y = (corners[0][0][1] + corners[0][1][1] + corners[0][2][1] + corners[0][3][1]) // 4
-    return int(center_x), int(center_y)
+    return [int(center_x), int(center_y)]
 
+def vector_from_points(pos1, pos2):
+    return np.array([int(pos2[0] - pos1[0]), int(pos2[1] - pos1[1])])
+
+
+def vector_length(vec):
+    return math.sqrt(vec[0] ** 2 + vec[1] ** 2)
+
+def replusion(pos):
+    force = np.array([0.0, 0.0])
+    for i in range(1, len(cargos)):
+        R = vector_from_points(cargos[i], pos) / 400 # vector from charge to test charge
+        if (not vector_length(R)): return [0, 0]
+        force += (R / (vector_length(R) ** 2) * 4.5)  if vector_length(R) < 0.3 else 0
+    x_f = int(force[0])
+    y_f = int(force[1])
+    force = np.array([x_f, y_f])
+    return force
+
+def attraction(pos, target):
+    force = np.array([0.0, 0.0])
+    if target[0] != -1:
+        vect = vector_from_points(pos, target)
+        force += vect / vector_length(vect) * 30
+        x_f = int(force[0])
+        y_f = int(force[1])
+        force = np.array([x_f, y_f])
+    return force
 
 def calculate_angle(corners):
     # Углы маркера: [top-left, top-right, bottom-right, bottom-left]
@@ -53,14 +91,14 @@ def calculate_angle(corners):
 
 
 def findAruco(img, draw=True):
-
-    global arDict
+    global arDict, cargos
     gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
     arucoDict = aruco.getPredefinedDictionary(aruco.DICT_4X4_250)  # Используем новый метод
     arucoParam = aruco.DetectorParameters()
     detector = aruco.ArucoDetector(arucoDict, arucoParam)  # Создаём детектор
     bbox, ids, _ = detector.detectMarkers(gray)  # Используем детектор
     if ids is not None and draw:
+        cargos = np.array([[-1, -1]])
         for i, marker_id in enumerate(ids):
             color = (0, 255, 0)
             corners = bbox[i].astype(int)
@@ -70,6 +108,9 @@ def findAruco(img, draw=True):
             if marker_id == 2 or marker_id == 3:
                 color = (255, 0, 0)
                 cv2.circle(img, center, 25, color, 3)
+            if marker_id >= 4 and marker_id <= 11 and marker_id != targets[target_ind]:
+                cent = np.array([center])
+                cargos = np.concatenate((cargos, cent), axis=0)
             cv2.polylines(img, [corners], isClosed=True, color=color, thickness=2)
             cv2.putText(img, f"{marker_id[0]}", tuple(corners[0][0]), cv2.FONT_HERSHEY_SIMPLEX, 0.7, (120, 0, 255), 2)
     return bbox, ids
@@ -89,18 +130,18 @@ def getANGaruco(id):
         return (None, None)
 
 def click(event, x, y, flags, param):
-    global keep_area, load_area, unload_area, flag, x_click, y_click
+    global keep_area, load_area, unload_area, flag, x_click, y_click, stop
     if event == cv2.EVENT_RBUTTONDOWN:
     #     flag = not flag
-        keep_area = hsv[y][x]
-        print(keep_area)
+        print(hsv[y][x])
     if event == cv2.EVENT_MBUTTONDOWN:
         load_area = hsv[y][x]
         print(load_area)
     if event == cv2.EVENT_LBUTTONDOWN:
+        stop = not stop
         x_click = x
         y_click = y
-        print(x_click, y_click)
+        print("click", x_click, y_click)
         # unload_area = hsv[y][x]
         # print(unload_area)
 
@@ -151,6 +192,17 @@ def hue_dv3_trackbar(val):
     global dv3
     dv3 = val
 
+def hue_dh4_trackbar(val):
+    global dh4
+    dh4 = val
+def hue_ds4_trackbar(val):
+    global ds4
+    ds4 = val
+def hue_dv4_trackbar(val):
+    global dv4
+    dv4 = val
+
+
 if camera_control:
     cv2.namedWindow("Trackbars")
     cv2.createTrackbar("dh", "Trackbars", dh, 255, hue_dh_trackbar)
@@ -159,9 +211,13 @@ if camera_control:
     cv2.createTrackbar("dh2", "Trackbars", dh2, 255, hue_dh2_trackbar)
     cv2.createTrackbar("ds2", "Trackbars", ds2, 255, hue_ds2_trackbar)
     cv2.createTrackbar("dv2", "Trackbars", dv2, 255, hue_dv2_trackbar)
-    cv2.createTrackbar("dh3", "Trackbars", dh3, 255, hue_dh3_trackbar)
-    cv2.createTrackbar("ds3", "Trackbars", ds3, 255, hue_ds3_trackbar)
-    cv2.createTrackbar("dv3", "Trackbars", dv3, 255, hue_dv3_trackbar)
+    # cv2.createTrackbar("dh3", "Trackbars", dh3, 255, hue_dh3_trackbar)
+    # cv2.createTrackbar("ds3", "Trackbars", ds3, 255, hue_ds3_trackbar)
+    # cv2.createTrackbar("dv3", "Trackbars", dv3, 255, hue_dv3_trackbar)
+    #
+    # cv2.createTrackbar("dh4", "Trackbars", dh4, 255, hue_dh4_trackbar)
+    # cv2.createTrackbar("ds4", "Trackbars", ds4, 255, hue_ds4_trackbar)
+    # cv2.createTrackbar("dv4", "Trackbars", dv4, 255, hue_dv4_trackbar)
 
 
 
@@ -171,11 +227,10 @@ cv2.setMouseCallback("img", click)
 
 while True:
     img = video_stream.read()[1][work_zone1[1]:work_zone2[1], work_zone1[0]:work_zone2[0]]
+    #img = cv2.imread("img.png")[work_zone1[1]:work_zone2[1], work_zone1[0]:work_zone2[0]]
     hsv = cv2.cvtColor(img, cv2.COLOR_BGR2HSV)
 
     bbox, ids = findAruco(img)
-    getXYaruco(9)
-
     lowKA = np.array([max(int(keep_area[0]) - dh, 0), max(int(keep_area[1]) - ds, 0), max(int(keep_area[2]) - dv, 0)])
     highKA = np.array([min(int(keep_area[0]) + dh, 255), min(int(keep_area[1]) + ds, 255), min(int(keep_area[2]) + dv, 255)])
     keep_area_mask = cv2.inRange(hsv, lowKA, highKA)
@@ -186,48 +241,87 @@ while True:
     highUA = np.array(
         [min(int(unload_area[0]) + dh3, 255), min(int(unload_area[1]) + ds3, 255), min(int(unload_area[2]) + dv3, 255)])
     unload_area_mask = cv2.inRange(hsv, lowUA, highUA)
+
+    lowCargo = np.array(
+        [max(int(cargo[0]) - dh4, 0), max(int(cargo[1]) - ds4, 0), max(int(cargo[2]) - dv4, 0)])
+    highCargo = np.array(
+        [min(int(cargo[0]) + dh4, 255), min(int(cargo[1]) + ds4, 255), min(int(cargo[2]) + dv4, 255)])
+    cargo_mask = cv2.inRange(hsv, lowCargo, highCargo)
+
     try:
-        if getXYaruco(2):
-            if x_click != -1:
-                xr, yr = getXYaruco(2)
-                xtarget, ytarget = x_click, y_click
-                cv2.line(img, (xr, yr), (xtarget, ytarget), (255, 0, 0), 2)
-                x_kat = xr - xtarget
-                y_kat = yr - ytarget
+        if getXYaruco(2)[0] != -1:
+            xr, yr = getXYaruco(2)
+            if hasTarget == False:
+                target = getXYaruco(targets[target_ind])
+                hasTarget = True
+
+
+            if target[0] != -1 and not stop:
+                dist_to_target = ((xr - target[0]) ** 2 + (yr - target[1]) ** 2) ** 0.5
+                if dist_to_target < 40:
+                    print("finish")
+                    if len(targets) >= target_ind:
+                        target_ind += 1
+                    else:
+                        stop = True
+
+                    hasTarget = False
+                for x in range(0, 40):
+                    for y in range(0, 40):
+                        r_pos = np.array([x * 25, y * 25])
+
+                        vect_attr = attraction(r_pos, target)
+                        vect_repl = replusion(r_pos)
+                        sum_vect = vect_attr + vect_repl
+
+                        cv2.arrowedLine(img, r_pos, (int(r_pos[0] + sum_vect[0]), int(r_pos[1] + sum_vect[1])), (0, 0, 255), 1)
+                        # cv2.arrowedLine(img, r_pos, (int(r_pos[0] + vect_attr[0]), int(r_pos[1] + vect_attr[1])),
+                        #                 (255, 0, 255), 1)
+
+
+                        # cv2.arrowedLine(img, r_pos, (int(r_pos[0] + vect_move[0]), int(r_pos[1] + vect_move[1])), (255, 0, 0), 1)
+                r_pos = np.array([xr, yr])
+                vect_attr = attraction(r_pos, target)
+                vect_repl = replusion(r_pos)
+                sum_vect = vect_attr + vect_repl
+
+                cv2.arrowedLine(img, r_pos, (int(r_pos[0] + sum_vect[0]), int(r_pos[1] + sum_vect[1])),
+                                (0, 0, 255), 2)
+
+                x_kat = int(sum_vect[0])
+                y_kat = int(sum_vect[1])
                 dist_err = (x_kat ** 2 + y_kat ** 2) ** 0.5
                 ang_rad = np.arctan2(y_kat, x_kat)
                 ang_deg = np.degrees(ang_rad)
                 ang_r = getANGaruco(2)
                 u = 0
                 ang_err = 0
-
-                if (ang_deg - ang_r  - 90) % 360 != 0:
-                    signs = [(ang_deg - ang_r - 90)/abs(ang_deg - ang_r - 90), (ang_deg - ang_r - 90 + 360)/abs(ang_deg - ang_r - 90 + 360), (ang_deg - ang_r - 90 - 360)/abs(ang_deg - ang_r - 90 - 360)]
-                    errs = [abs(ang_deg - ang_r - 90), abs(ang_deg - ang_r - 90 + 360), abs(ang_deg - ang_r - 90 - 360)]
+                if (ang_deg - ang_r + 90) % 360 != 0:
+                    signs = [(ang_deg - ang_r + 90)/abs(ang_deg - ang_r + 90), (ang_deg - ang_r + 90 + 360)/abs(ang_deg - ang_r + 90 + 360), (ang_deg - ang_r + 90 - 360)/abs(ang_deg - ang_r + 90 - 360)]
+                    errs = [abs(ang_deg - ang_r + 90), abs(ang_deg - ang_r + 90 + 360), abs(ang_deg - ang_r + 90 - 360)]
                     indx_err = errs.index(min(errs))
                     ang_err = min(errs) * signs[indx_err]
-                    print(ang_err, signs[indx_err])
-                if abs(ang_err) > 20 and dist_err > 100:
-                    u = int(ang_err * 3)
-                    set_speed(u, -u)
-                elif dist_err:
+                if abs(ang_err) > 5 and dist_err > 100:
                     u = int(ang_err * 1)
-                    u_dist = int(dist_err * 2)
+                    set_speed(u, -u)
+                else:
+                    u = int(ang_err * 4)
+                    u_dist = int(dist_err * 10)
                     set_speed(u_dist + u,u_dist - u)
-
-        else:
-            set_speed(0, 0)
-
+            else:
+                set_speed(0, 0)
     except Exception as err:
         print(err)
+
     if camera_control:
         cv2.imshow("keep_area_mask", keep_area_mask)
         cv2.imshow("load_area_mask", load_area_mask)
         cv2.imshow("unload_area_mask", unload_area_mask)
+        cv2.imshow("cargo_mask", cargo_mask)
 
-    draw_contours(img, keep_area_mask, num=7, color=(255, 0, 0), thickness=2)
-    draw_contours(img, load_area_mask, num=1, color=(0, 255, 0), thickness=2)
-    draw_contours(img, unload_area_mask, num=2, color=(0, 0, 255), thickness=2)
+    draw_contours(img, keep_area_mask, num=7, color=(255, 255, 0), thickness=2)
+    draw_contours(img, load_area_mask, num=1, color=(0, 255, 255), thickness=2)
+    draw_contours(img, unload_area_mask, num=2, color=(255, 0, 255), thickness=2)
 
     cv2.imshow("img", img)
     if cv2.waitKey(1) == 113:
