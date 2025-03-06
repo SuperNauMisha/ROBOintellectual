@@ -5,8 +5,6 @@ import paramiko
 import time
 import math
 
-from unicodedata import normalize
-
 flag = True
 debug = False
 camera_control = False
