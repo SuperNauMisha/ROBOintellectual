@@ -57,7 +57,7 @@ def calculate_angle(corners):
 ```
 ### Отрисовка контуров
 Для отрисовки контуров из кадра были выделины три основных цвета, на каждую из которых была наложена маскa и ориентируясь по границам  OpenCv отрисовывает границы. Также необходимо отметить, что, зачастую, из-за изменений света, маски приходилось перенастраивать, для удобства чего есть Trackbar на каждую из частей кадра.
-
+![](photo/detector.jpg)
 - Отрисовка
 ```python
 def draw_contours(image, mask, num=2, color=(0, 255, 0), thickness=2):
@@ -105,6 +105,8 @@ def draw_contours(image, mask, num=2, color=(0, 255, 0), thickness=2):
 
 ### Построение маршрута по векторному полю
 На каждую точку карты можможно спроецировать вектор желаемого направления движения робота, складывающийся из двух векторов: одного, напрвленного в сторону желаемой точки, и других, направленных от препятствий к текущему положению. По этому вектору можно составить желаему траекторию движения с учетом препятствий.
+![](photo/vectors.jpg)
+![](photo/vector%20field.jpg)
 
 ```python
 def replusion(pos):
@@ -153,25 +155,27 @@ def change_speed():
             break
     teleop.send_velocity(0, 0)
 
+
+```
+###  Подключение из кода камеры по ssh к raspberry pi. 
+
+```python
+ssh = paramiko.SSHClient()
+ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+ssh.connect('192.168.2.109', username='pi', password='rpi3')
+shell = ssh.invoke_shell()
+shell.send('cd workspace\n')
+shell.send('source venv/bin/activate\n')
+time.sleep(0.1)
+shell.send('python3 solution.py\n')
+set_speed(0, 0)
+time.sleep(0.5)
+
 ....
 
 def set_speed(lspeed, rspeed):
     if not debug:
         shell.send(f'{lspeed} {rspeed}\n')
-```
-###  Подключение из кода камеры по ssh к raspberry pi. 
 
-```python
-    ssh = paramiko.SSHClient()
-    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
-    ssh.connect('192.168.2.109', username='pi', password='rpi3')
-    shell = ssh.invoke_shell()
-    shell.send('cd workspace\n')
-    shell.send('source venv/bin/activate\n')
-    time.sleep(0.1)
-    shell.send('python3 solution.py\n')
-    set_speed(0, 0)
-    time.sleep(0.5)
 ```
-#
 # [Видео нашего решения](https://drive.google.com/drive/folders/1--EMUVPgcaIZSfNFEPajci6DlPNGrIuc/ "Гугл Диск")
