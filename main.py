@@ -9,17 +9,16 @@ from dotenv import load_dotenv
 
 load_dotenv('.env')
 
-
 task_id = 0
 debug = False
-camera_control = True
+vector_draw = False
+camera_control = False
 video_stream = cv2.VideoCapture('http://root:admin@10.128.73.78/mjpg/video.mjpg')
 cargos = np.array([[]])
 target_ind = 0
 hasTarget = False
 target = [-1, -1]
 targets = [-1]
-print(cargos)
 stop = True
 def set_speed(lspeed, rspeed):
     if not debug:
@@ -158,12 +157,12 @@ def click(event, x, y, flags, param):
             print("task_id:", task_id)
             task.start(stage=1, task_id=task_id)
             nowtask = task.getTask()
+            print(nowtask)
             targets = list()
             for i in nowtask:
                 targets.append(i["cargo_id"])
             target_ind = 0
             stop = False
-            print("targets", targets)
 
 def draw_contours(image, mask, num=2, color=(0, 255, 0), thickness=2):
     contours, _ = cv2.findContours(mask, cv2.RETR_EXTERNAL, cv2.CHAIN_APPROX_SIMPLE)
@@ -271,18 +270,15 @@ while True:
                 target_ind = 0
             hasTarget = False
 
-        
-        # for x in range(0, 40):
-        #     for y in range(0, 40):
-        #         r_pos = np.array([x * 25, y * 25])
-        #
-        #         vect_attr = attraction(r_pos, target)
-        #         vect_repl = replusion(r_pos)
-        #         sum_vect = vect_attr + vect_repl
-        #
-        #         cv2.arrowedLine(img, r_pos, (int(r_pos[0] + sum_vect[0]), int(r_pos[1] + sum_vect[1])), (0, 0, 255), 1)
-        #         # cv2.arrowedLine(img, r_pos, (int(r_pos[0] + vect_attr[0]), int(r_pos[1] + vect_attr[1])),
-                #                 (255, 0, 255), 1)
+        if vector_draw:
+            for x in range(0, 40):
+                for y in range(0, 40):
+                    r_pos = np.array([x * 25, y * 25])
+                    vect_attr = attraction(r_pos, target)
+                    vect_repl = replusion(r_pos)
+                    sum_vect = vect_attr + vect_repl
+                    cv2.arrowedLine(img, r_pos, (int(r_pos[0] + sum_vect[0]), int(r_pos[1] + sum_vect[1])), (0, 0, 255), 1)
+
 
 
                 # cv2.arrowedLine(img, r_pos, (int(r_pos[0] + vect_move[0]), int(r_pos[1] + vect_move[1])), (255, 0, 0), 1)
@@ -323,10 +319,10 @@ while True:
         cv2.imshow("keep_area_mask", keep_area_mask)
         cv2.imshow("load_area_mask", load_area_mask)
         cv2.imshow("unload_area_mask", unload_area_mask)
-
-    draw_contours(img, keep_area_mask, num=7, color=(255, 255, 0), thickness=2)
-    draw_contours(img, load_area_mask, num=1, color=(0, 255, 255), thickness=2)
-    draw_contours(img, unload_area_mask, num=2, color=(255, 0, 255), thickness=2)
+    if targets[0] == -1:
+        draw_contours(img, keep_area_mask, num=7, color=(255, 255, 0), thickness=2)
+        draw_contours(img, load_area_mask, num=1, color=(0, 255, 255), thickness=2)
+        draw_contours(img, unload_area_mask, num=2, color=(255, 0, 255), thickness=2)
 
     cv2.imshow("img", img)
     if cv2.waitKey(1) == 113:
