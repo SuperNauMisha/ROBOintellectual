@@ -11,12 +11,6 @@
 - Paramiko
 - Time
 - Math
-## Основные колмплектующие:
-- 
-- 
-- 
-настройка
-есть флаг при 1 появляются тракбары с помощью которых можно настраивать цвета, более того цвет можно изменить кликнув мышью 
 
 
 ### Поиск аруко маркеров
@@ -142,7 +136,42 @@ def attraction(pos, target):
 
 
 ```
+### Отправка скорости на моторы
+Консоль ожидает получения скоростей моторов.
 
+```python
+def change_speed():
+    global lspeed, rspeed, edited
+    teleop = MyTeleop()
+    while True:
+        try:
+            l, r = input().split()
+            lspeed = int(l)
+            rspeed = int(r)
+            teleop.send_velocity(lspeed, rspeed)
+        except KeyboardInterrupt:
+            break
+    teleop.send_velocity(0, 0)
 
+....
 
+def set_speed(lspeed, rspeed):
+    if not debug:
+        shell.send(f'{lspeed} {rspeed}\n')
+```
+###  Подключение из кода камеры по ssh к raspberry pi. 
 
+```python
+    ssh = paramiko.SSHClient()
+    ssh.set_missing_host_key_policy(paramiko.AutoAddPolicy())
+    ssh.connect('192.168.2.109', username='pi', password='rpi3')
+    shell = ssh.invoke_shell()
+    shell.send('cd workspace\n')
+    shell.send('source venv/bin/activate\n')
+    time.sleep(0.1)
+    shell.send('python3 solution.py\n')
+    set_speed(0, 0)
+    time.sleep(0.5)
+```
+#
+# [Видео нашего решения](https://drive.google.com/drive/folders/1--EMUVPgcaIZSfNFEPajci6DlPNGrIuc/ "Гугл Диск")
